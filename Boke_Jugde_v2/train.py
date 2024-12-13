@@ -127,7 +127,7 @@ else:
 print(f"学習に用いる大喜利の数: {len(train_boke_datas)},", 
       f"学習に用いるキャプションの数: {len(train_caption_datas)},", 
       f"検証に用いる大喜利の数: {len(test_boke_datas)},", 
-      f"検証に用いるキャプションの数{len(test_caption_datas)}")
+      f"検証に用いるキャプションの数: {len(test_caption_datas)}")
 
 # モデルの学習
 train_loss_history = []
@@ -178,6 +178,7 @@ for epoch in range(EPOCH):
     print(f"Epoch: {epoch+1}/{EPOCH}, "
           f"Train Loss: {train_loss:.4f}, Train Accuracy: {train_accuracy:.4f}, "
           f"Test Loss: {test_loss:.4f}, Test Accuracy: {test_accuracy:.4f}")
+    print("-" * 25)
 
     train_loss_history.append(train_loss)
     train_accuracy_history.append(train_accuracy)
