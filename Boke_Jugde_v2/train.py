@@ -52,6 +52,7 @@ if not os.path.exists("../../results/Boke_Judge/"):
     os.mkdir("../../results/Boke_Judge/")
 if not os.path.exists(RESULT_DIR):
     os.mkdir(RESULT_DIR)
+print(f"result directory: {RESULT_DIR}")
 
 # データセットの作成
 if not os.path.exists(f"{RESULT_DIR}test_caption_datas.json") or REST_DATA:
