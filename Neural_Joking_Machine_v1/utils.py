@@ -13,6 +13,9 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision.models as models
 import torchvision.transforms as transforms
 
+import subprocess
+if not os.path.exists("Japanese_BPEEncoder_V2"):
+    subprocess.run(["git", "clone", "https://github.com/tanreinama/Japanese-BPEEncoder_V2.git", "Japanese_BPEEncoder_V2"])
 from Japanese_BPEEncoder_V2.encode_swe import SWEEncoder_ja
 
 # ハイパーパラメータ（実験ごとに変更しない）
@@ -26,10 +29,6 @@ IMAGE_DIR = "../../datas/boke_image/"
 IMAGE_FEATURE_DIR = "../../datas/encoded/resnet152_image_feature/"
 if not os.path.exists(IMAGE_FEATURE_DIR):
     os.mkdir(IMAGE_FEATURE_DIR)
-
-if not os.path.exists("Japanese_BPEEncoder_V2"):
-    subprocess.run(["git", "clone", "https://github.com/tanreinama/Japanese-BPEEncoder_V2.git", "Japanese_BPEEncoder_V2"])
-    os.rename("Japanese-BPEEncoder_V2", "Japanese_BPEEncoder_V2")
 
 # 画像のデータローダを作る関数
 def make_image_dataloader(image_numbers, num_workers = 4):
@@ -154,7 +153,7 @@ class BokeGeneratorModel(nn.Module):
         self.lstm = nn.LSTM(input_size = embedding_dim, hidden_size = embedding_dim, 
                             batch_first = True)
         self.fc2 = nn.Linear(embedding_dim, 2048)
-        self.fc3 = nn.Linear(2048, 4096)
+        # self.fc3 = nn.Linear(2048, 4096)
         self.fc4 = nn.Linear(4096, num_word)
         
     def forward(self, image_features, sentences):
@@ -170,7 +169,7 @@ class BokeGeneratorModel(nn.Module):
         x, (_, _) = self.lstm(x2, (h0, c0))
 
         x = F.leaky_relu(self.fc2(x))
-        x = F.leaky_relu(self.fc3(x))
+        # x = F.leaky_relu(self.fc3(x))
 
         return F.softmax(self.fc4(x), dim = -1)
 
