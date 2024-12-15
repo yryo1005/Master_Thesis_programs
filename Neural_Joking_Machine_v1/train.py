@@ -227,7 +227,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 model = BokeGeneratorModel(num_word = len(index_to_word), 
                            image_feature_dim = 2048, 
                            sentence_length = MAX_SENTENCE_LENGTH + 1, 
-                           embedding_dim = 512)
+                           embedding_dim = 2048)
 model.to(device)
 optimizer = optim.AdamW(model.parameters(), lr = LEARNING_RATO)
 

@@ -20,8 +20,8 @@ from Japanese_BPEEncoder_V2.encode_swe import SWEEncoder_ja
 
 # ハイパーパラメータ（実験ごとに変更しない）
 EPOCH = 25
-BATCH_SIZE = 64
-LEARNING_RATO = 0.001
+BATCH_SIZE = 512
+LEARNING_RATO = 0.0001
 
 DATA_DIR = "../../datas/boke_data_assemble/"
 IMAGE_DIR = "../../datas/boke_image/"
@@ -134,6 +134,7 @@ def make_dataloader(boke_datas, max_sentence_length, num_workers = 4):
     return dataloader
 
 # 大喜利生成モデルのクラス
+# 大喜利生成モデルのクラス
 class BokeGeneratorModel(nn.Module):
     def __init__(self, num_word, image_feature_dim, sentence_length, embedding_dim = 512):
         """
@@ -152,26 +153,25 @@ class BokeGeneratorModel(nn.Module):
         self.embedding = nn.Embedding(num_word, embedding_dim, padding_idx = 0)
         self.lstm = nn.LSTM(input_size = embedding_dim, hidden_size = embedding_dim, 
                             batch_first = True)
-        self.fc2 = nn.Linear(embedding_dim, 2048)
-        # self.fc3 = nn.Linear(2048, 4096)
-        self.fc4 = nn.Linear(4096, num_word)
-        
+        self.fc2 = nn.Linear(embedding_dim + embedding_dim, embedding_dim)
+        self.fc3 = nn.Linear(embedding_dim, num_word)
+    
+    # LSTMの初期値は0で，画像の特徴量と文章の特徴量を全結合層の前で結合する
     def forward(self, image_features, sentences):
         """
             image_features: 画像の特徴量
             sentences: 入力する文章
         """
         x1 = F.leaky_relu(self.fc1(image_features))
-        h0 = x1.unsqueeze(0)
-        c0 = torch.zeros_like(h0)
+        x1 = x1.unsqueeze(1).repeat(1, self.sentence_length, 1)
 
         x2 = self.embedding(sentences)
-        x, (_, _) = self.lstm(x2, (h0, c0))
+        x2, _ = self.lstm(x2)
 
+        x = torch.cat((x1, x2), dim = -1)
         x = F.leaky_relu(self.fc2(x))
-        # x = F.leaky_relu(self.fc3(x))
 
-        return F.softmax(self.fc4(x), dim = -1)
+        return self.fc3(x)
 
 # 文章生成の精度を計算する関数
 def calculate_accuracy(teacher_signals, outputs):
@@ -194,7 +194,7 @@ def train_step(model, optimizer, batch_data, batch_labels):
     # パディングに対して損失を計算しない
     loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), batch_labels.view(-1),
                            ignore_index = 0)
-    accuracy = calculate_accuracy(batch_labels, outputs)
+    accuracy = calculate_accuracy(batch_labels, F.softmax(outputs, dim = -1))
     loss.backward()
     optimizer.step()
     return loss.item(), accuracy
@@ -205,5 +205,5 @@ def evaluate(model, batch_data, batch_labels):
         outputs = model(*batch_data)
         loss = F.cross_entropy(outputs.view(-1, outputs.size(-1)), batch_labels.view(-1),
                                ignore_index = 0)
-        accuracy = calculate_accuracy(batch_labels, outputs)
+        accuracy = calculate_accuracy(batch_labels, F.softmax(outputs, dim = -1))
     return loss.item(), accuracy
