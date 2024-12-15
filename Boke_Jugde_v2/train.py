@@ -30,7 +30,7 @@ args = parser.parse_args()
 # PCによって変更する
 NUM_WORKERS = args.num_workers
 # データセットが既に存在する場合に，再度作り直すか
-REST_DATA = args.reset_data
+RESET_DATA = args.reset_data
 
 EXPERIENCE_NUMBER = args.experience_number
 
@@ -55,7 +55,7 @@ if not os.path.exists(RESULT_DIR):
 print(f"result directory: {RESULT_DIR}")
 
 # データセットの作成
-if not os.path.exists(f"{RESULT_DIR}test_caption_datas.json") or REST_DATA:
+if not os.path.exists(f"{RESULT_DIR}test_caption_datas.json") or RESET_DATA:
     
     boke_datas = list()
     caption_datas = list()
@@ -125,9 +125,9 @@ else:
     with open(f"{RESULT_DIR}test_caption_datas.json", "r") as f:
         test_caption_datas = json.load(f)
 
-print(f"学習に用いる大喜利の数: {len(train_boke_datas)},", 
-      f"学習に用いるキャプションの数: {len(train_caption_datas)},", 
-      f"検証に用いる大喜利の数: {len(test_boke_datas)},", 
+print(f"学習に用いる大喜利の数: {len(train_boke_datas)}\n", 
+      f"学習に用いるキャプションの数: {len(train_caption_datas)}\n", 
+      f"検証に用いる大喜利の数: {len(test_boke_datas)}\n", 
       f"検証に用いるキャプションの数: {len(test_caption_datas)}")
 
 # モデルの学習
@@ -136,7 +136,9 @@ train_accuracy_history = []
 test_loss_history = []
 test_accuracy_history = []
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
 model = BokeJudgeModel()
+model.to(device)
 optimizer = optim.AdamW(model.parameters(), lr = LEARNING_RATO)
 
 for epoch in range(EPOCH):
@@ -150,6 +152,11 @@ for epoch in range(EPOCH):
     pb = tqdm(train_dataloader, desc = f"Epoch {epoch+1}/{EPOCH}")
     
     for CIF, CSF, LSF, TS in pb:
+        CIF = CIF.to(device)
+        CSF = CSF.to(device)
+        LSF = LSF.to(device)
+        TS = TS.to(device)
+
         loss, accuracy = train_step(model, optimizer, (CIF, CSF, LSF), TS)
         train_loss_obj += loss
         train_accuracy_obj += accuracy
@@ -168,6 +175,11 @@ for epoch in range(EPOCH):
     pb = tqdm(test_dataloader, desc = "Evaluating")
 
     for CIF, CSF, LSF, TS in pb:
+        CIF = CIF.to(device)
+        CSF = CSF.to(device)
+        LSF = LSF.to(device)
+        TS = TS.to(device)
+        
         loss, accuracy = evaluate(model, (CIF, CSF, LSF), TS)
         test_loss_obj += loss
         test_accuracy_obj += accuracy
