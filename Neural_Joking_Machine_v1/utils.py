@@ -21,7 +21,7 @@ from Japanese_BPEEncoder_V2.encode_swe import SWEEncoder_ja
 
 # ハイパーパラメータ（実験ごとに変更しない）
 EPOCH = 25
-BATCH_SIZE = 512
+BATCH_SIZE = 32
 LEARNING_RATO = 0.0001
 
 DATA_DIR = "../../datas/boke_data_assemble/"
@@ -154,8 +154,9 @@ class BokeGeneratorModel(nn.Module):
         self.embedding = nn.Embedding(num_word, embedding_dim, padding_idx = 0)
         self.lstm = nn.LSTM(input_size = embedding_dim, hidden_size = embedding_dim, 
                             batch_first = True)
-        self.fc2 = nn.Linear(embedding_dim + embedding_dim, embedding_dim)
-        self.fc3 = nn.Linear(embedding_dim, num_word)
+        self.fc2 = nn.Linear(embedding_dim + embedding_dim, 2 * embedding_dim)
+        self.fc3 = nn.Linear(2 * embedding_dim, 2 * embedding_dim)
+        self.fc4 = nn.Linear(2 * embedding_dim, num_word)
     
     # LSTMの初期値は0で，画像の特徴量と文章の特徴量を全結合層の前で結合する
     def forward(self, image_features, sentences):
@@ -171,8 +172,9 @@ class BokeGeneratorModel(nn.Module):
 
         x = torch.cat((x1, x2), dim = -1)
         x = F.leaky_relu(self.fc2(x))
+        x = F.leaky_relu(self.fc3(x))
 
-        return self.fc3(x)
+        return self.fc4(x)
 
 # 文章生成の精度を計算する関数
 def calculate_accuracy(teacher_signals, outputs):
