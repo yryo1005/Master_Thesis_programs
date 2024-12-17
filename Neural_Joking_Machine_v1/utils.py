@@ -18,10 +18,14 @@ from Japanese_BPEEncoder_V2.encode_swe import SWEEncoder_ja
 # ハイパーパラメータ（実験ごとに変更しない）
 EPOCH = 25
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 BATCH_SIZE = 64
 LEARNING_RATO = 0.005
 =======
 BATCH_SIZE = 128 # 512
+=======
+BATCH_SIZE = 256 # 32
+>>>>>>> Stashed changes
 LEARNING_RATO = 0.0001
 >>>>>>> Stashed changes
 
