@@ -230,3 +230,33 @@ ax.legend()
 ax.grid()
 
 fig.savefig(f"{RESULT_DIR}history.png")
+
+# テストデータでモデルを評価
+evaluate_result_dict = evaluate_model(EXPERIENCE_NUMBER)
+with open(f"{RESULT_DIR}evaluation_result.json", "w") as f:
+    json.dump(evaluate_result_dict, f)
+
+x = list()
+caption_evaluations = list()
+boke_evaluations = list()
+miss_boke_evaluations = list()
+for K, V in evaluate_result_dict.items():
+    x.append(K)
+    caption_evaluations.append(V["caption"])
+    boke_evaluations.append(V["boke"])
+    miss_boke_evaluations.append(V["miss_boke"])
+
+fig = plt.figure(figsize = (5, 5))
+ax = fig.add_subplot()
+ax.plot(x, caption_evaluations, label = "caption", color = "red")
+ax.plot(x, boke_evaluations, label = "boke", color = "blue")
+ax.plot(x, miss_boke_evaluations, label = "miss boke", color = "green")
+ax.scatter(x, caption_evaluations, color = "red")
+ax.scatter(x, boke_evaluations, color = "blue")
+ax.scatter(x, miss_boke_evaluations, color = "green")
+ax.legend()
+ax.grid()
+ax.set_ylabel("accuracy")
+ax.set_xlabel("threshold")
+
+fig.savefig(f"{RESULT_DIR}evaluation_result.png")

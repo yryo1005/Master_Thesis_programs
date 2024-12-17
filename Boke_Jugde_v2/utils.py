@@ -268,3 +268,77 @@ class BokeJugeAI:
                                         luke_sentence_feature.to(self.device))
 
         return outputs.cpu().numpy()
+
+# テストデータでモデルを評価する関数
+def evaluate_model(experience_number, thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]):
+    def calculate_accuracy(predictions, threshold = 0.5):
+        return sum(np.array(predictions) > threshold) / len(predictions)
+
+    boke_judge_ai = BokeJugeAI(f"../../results/Boke_Judge/{experience_number}/best_model_weights.pth")
+
+    # evaluate for caption
+    print("evaluating caption...")
+    predictions_for_caption = list()
+    with open(f"../../results/Boke_Judge/{experience_number}/test_caption_datas.json", "r") as f:
+        test_caption_datas = json.load(f)
+    
+    for D in tqdm(test_caption_datas):
+        image_number = D["image_number"]
+        with open(f"../../datas/boke_data_assemble/{image_number}.json", "r") as f:
+            ja_caption = json.load(f)["image_information"]["ja_caption"]
+        judge = boke_judge_ai(f"../../datas/boke_image/{image_number}.jpg",
+                            ja_caption) 
+        predictions_for_caption.append(judge[0][0])
+    
+    # evaluate for boke
+    print("evaluating boke...")
+    predictions_for_boke = list()
+    with open("../../results/Boke_Judge/006/test_boke_datas.json", "r") as f:
+        test_boke_datas = json.load(f)
+
+    for D in tqdm(test_boke_datas):
+        image_number = D["image_number"]
+        boke_number = D["boke_number"]
+        with open(f"../../datas/boke_data_assemble/{image_number}.json", "r") as f:
+            boke = json.load(f)["bokes"][boke_number]["boke"]
+        judge = boke_judge_ai(f"../../datas/boke_image/{image_number}.jpg",
+                            boke) 
+        predictions_for_boke.append(judge[0][0])
+
+    # evaluate for miss boke
+    print("evaluating miss boke...")
+    predictions_for_miss_boke = list()
+    test_miss_boke_datas = list()
+    tmp_idx = np.random.randint(0, len(test_boke_datas), size = (len(test_boke_datas), ))
+    for i, idx in tqdm(enumerate(tmp_idx)):
+        # ランダムに選んだ大喜利の画像が正例の画像と同じ限り繰り返す
+        while test_boke_datas[idx]["image_number"] == test_boke_datas[i]["image_number"]:
+            idx = np.random.randint(0, len(test_boke_datas))
+
+        test_miss_boke_datas.append({
+            "boke_number": test_boke_datas[i]["boke_number"],
+            "original_image_number": test_boke_datas[i]["image_number"],
+            "miss_image_number": test_boke_datas[idx]["image_number"]
+        })
+
+    for D in tqdm(test_miss_boke_datas):
+        original_image_number = D["original_image_number"]
+        miss_image_number = D["miss_image_number"]
+        boke_number = D["boke_number"]
+        with open(f"../../datas/boke_data_assemble/{original_image_number}.json", "r") as f:
+            boke = json.load(f)["bokes"][boke_number]["boke"]
+        judge = boke_judge_ai(f"../../datas/boke_image/{miss_image_number}.jpg",
+                            boke) 
+        predictions_for_miss_boke.append(judge[0][0])
+
+    result_dict = dict()
+    for T in thresholds:
+        result_dict[T] = {
+            "caption": 1 - calculate_accuracy(predictions_for_caption, T),
+            "boke": calculate_accuracy(predictions_for_boke, T),
+            "miss_boke": 1 - calculate_accuracy(predictions_for_miss_boke, T)
+        }
+    
+    return result_dict
+
+evaluate_result_dict = evaluate_model("006")
