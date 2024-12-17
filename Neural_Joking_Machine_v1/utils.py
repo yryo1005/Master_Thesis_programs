@@ -20,8 +20,13 @@ from Japanese_BPEEncoder_V2.encode_swe import SWEEncoder_ja
 
 # ハイパーパラメータ（実験ごとに変更しない）
 EPOCH = 25
+<<<<<<< Updated upstream
 BATCH_SIZE = 32 # 512
 LEARNING_RATO = 0.0001
+=======
+BATCH_SIZE = 32
+LEARNING_RATO = 0.001 # 0.0001
+>>>>>>> Stashed changes
 
 DATA_DIR = "../../datas/boke_data_assemble/"
 IMAGE_DIR = "../../datas/boke_image/"
