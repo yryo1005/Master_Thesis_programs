@@ -232,7 +232,9 @@ ax.grid()
 fig.savefig(f"{RESULT_DIR}history.png")
 
 # テストデータでモデルを評価
-evaluate_result_dict = evaluate_model(EXPERIENCE_NUMBER)
+evaluate_result_dict = evaluate_model(f"{RESULT_DIR}best_model_weights.pth",
+                                      boke_data_path = f"{RESULT_DIR}test_boke_datas.json", 
+                                      caption_data_path = f"{RESULT_DIR}test_caption_datas.json")
 with open(f"{RESULT_DIR}evaluation_result.json", "w") as f:
     json.dump(evaluate_result_dict, f)
 

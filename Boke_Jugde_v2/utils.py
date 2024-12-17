@@ -22,6 +22,7 @@ BATCH_SIZE = 64
 LEARNING_RATO = 0.0001
 
 DATA_DIR = "../../datas/boke_data_assemble/"
+IMAGE_DIR = "../../datas/boke_image/"
 CLIP_IMAGE_FEATURE_DIR = "../../datas/encoded/clip_image_feature/"
 CLIP_SENTENCE_FEATURE_DIR = "../../datas/encoded/clip_sentence_feature/"
 LUKE_SENTENCE_FEATURE_DIR = "../../datas/encoded/luke_sentence_feature/"
@@ -270,21 +271,27 @@ class BokeJugeAI:
         return outputs.cpu().numpy()
 
 # テストデータでモデルを評価する関数
-def evaluate_model(experience_number, thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]):
+def evaluate_model(weight_path, boke_data_path, caption_data_path,
+                   thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]):
+    """
+        weight_path: 大喜利適合判定モデルの学習済みの重みのパス
+        boke_data_path: {"image_number":お題画像の番号，"boke_number":image_numberの画像の何番目の大喜利か}のリストのjsonファイルのパス
+        caption_data_path: {"image_number":お題画像の番号}のリストのjsonファイルのパス
+    """
     def calculate_accuracy(predictions, threshold = 0.5):
         return sum(np.array(predictions) > threshold) / len(predictions)
 
-    boke_judge_ai = BokeJugeAI(f"../../results/Boke_Judge/{experience_number}/best_model_weights.pth")
+    boke_judge_ai = BokeJugeAI(weight_path)
 
     # evaluate for caption
     print("evaluating caption...")
     predictions_for_caption = list()
-    with open(f"../../results/Boke_Judge/{experience_number}/test_caption_datas.json", "r") as f:
+    with open(caption_data_path, "r") as f:
         test_caption_datas = json.load(f)
     
     for D in tqdm(test_caption_datas):
         image_number = D["image_number"]
-        with open(f"../../datas/boke_data_assemble/{image_number}.json", "r") as f:
+        with open(f"{DATA_DIR}{image_number}.json", "r") as f:
             ja_caption = json.load(f)["image_information"]["ja_caption"]
         judge = boke_judge_ai(f"../../datas/boke_image/{image_number}.jpg",
                             ja_caption) 
@@ -293,15 +300,15 @@ def evaluate_model(experience_number, thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6
     # evaluate for boke
     print("evaluating boke...")
     predictions_for_boke = list()
-    with open("../../results/Boke_Judge/006/test_boke_datas.json", "r") as f:
+    with open(boke_data_path, "r") as f:
         test_boke_datas = json.load(f)
 
     for D in tqdm(test_boke_datas):
         image_number = D["image_number"]
         boke_number = D["boke_number"]
-        with open(f"../../datas/boke_data_assemble/{image_number}.json", "r") as f:
+        with open(f"{DATA_DIR}{image_number}.json", "r") as f:
             boke = json.load(f)["bokes"][boke_number]["boke"]
-        judge = boke_judge_ai(f"../../datas/boke_image/{image_number}.jpg",
+        judge = boke_judge_ai(f"{IMAGE_DIR}{image_number}.jpg",
                             boke) 
         predictions_for_boke.append(judge[0][0])
 
@@ -325,9 +332,9 @@ def evaluate_model(experience_number, thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6
         original_image_number = D["original_image_number"]
         miss_image_number = D["miss_image_number"]
         boke_number = D["boke_number"]
-        with open(f"../../datas/boke_data_assemble/{original_image_number}.json", "r") as f:
+        with open(f"{DATA_DIR}{original_image_number}.json", "r") as f:
             boke = json.load(f)["bokes"][boke_number]["boke"]
-        judge = boke_judge_ai(f"../../datas/boke_image/{miss_image_number}.jpg",
+        judge = boke_judge_ai(f"{IMAGE_DIR}{miss_image_number}.jpg",
                             boke) 
         predictions_for_miss_boke.append(judge[0][0])
 
@@ -340,5 +347,3 @@ def evaluate_model(experience_number, thresholds = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6
         }
     
     return result_dict
-
-evaluate_result_dict = evaluate_model("006")
