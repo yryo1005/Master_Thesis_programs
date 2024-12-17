@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import japanize_matplotlib
 from PIL import Image
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
@@ -210,3 +211,75 @@ def evaluate(model, batch_data, batch_labels):
                                ignore_index = 0)
         accuracy = calculate_accuracy(batch_labels, F.softmax(outputs, dim = -1))
     return loss.item(), accuracy
+
+# 大喜利生成AI
+class NeuralJokingMachine:
+    def __init__(self, weight_path, index_to_word, sentence_length, embedding_dim = 512):
+        """
+            weight_path: 大喜利適合判定モデルの学習済みの重みのパス
+            index_to_word: 単語のID: 単語の辞書(0:<PAD>, 1:<START>, 2:<END>)
+            sentence_length: 入力する文章の単語数
+            embedding_dim: 単語の埋め込み次元数
+        """
+        self.index_to_word = index_to_word
+        self.sentence_length = sentence_length
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.boke_generate_model = BokeGeneratorModel(
+                                        num_word = len(index_to_word), 
+                                        image_feature_dim = 2048, 
+                                        sentence_length = sentence_length, 
+                                        embedding_dim = embedding_dim)
+        self.boke_generate_model.load_state_dict(torch.load(weight_path))
+        self.boke_generate_model.to(self.device)
+        self.boke_generate_model.eval()
+
+        self.resnet152 = models.resnet152(pretrained = True)
+        self.resnet152 = torch.nn.Sequential(*list(self.resnet152.children())[:-1] + [nn.Flatten()])
+        self.resnet152 = self.resnet152.to(self.device)
+        self.resnet152.eval()
+
+        # 画像の前処理
+        self.image_preprocesser = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
+        ])
+    
+    def __call__(self, image_path, argmax = False, top_k = 5):
+        """
+            image_path: 大喜利を生成したい画像のパス
+            argmax: Trueなら最大確率の単語を選ぶ, FalseならTop-Kサンプリングを行う
+            top_k: Top-Kサンプリング時に考慮する単語の数
+        """
+        image = Image.open(image_path)
+        preprocessed_image = self.image_preprocesser(image).to(self.device)
+        image_feature = self.resnet152( preprocessed_image.unsqueeze(0) ) # (1, 2048)
+        
+        generated_text = [1] # <START>トークン
+        for i in range(1, self.sentence_length):
+            tmp = generated_text + [0] * (self.sentence_length - i) # Padding
+            tmp = torch.Tensor(np.array(tmp)).unsqueeze(0).to(self.device).to(dtype=torch.int32) # (1, sentence_length)
+            pred = self.boke_generate_model(image_feature, tmp) # (1, sentence_length, num_word)
+            target_pred = pred[0][i - 1]
+
+            if argmax:
+                # 最大確率の単語を選ぶ
+                chosen_id = torch.argmax(target_pred).item()
+            else:
+                # Top-Kサンプリング
+                top_k_probs, top_k_indices = torch.topk(target_pred, top_k)
+                top_k_probs = torch.nn.functional.softmax(top_k_probs, dim = -1)
+                chosen_id = np.random.choice(top_k_indices.detach().cpu().numpy(), 
+                                             p = top_k_probs.detach().cpu().numpy())
+            
+            generated_text.append(chosen_id)
+            if chosen_id == 2:
+                break
+        
+        generated_sentence = ""
+        for I in generated_text[1:-1]:
+            generated_sentence += self.index_to_word[I]
+        return generated_sentence

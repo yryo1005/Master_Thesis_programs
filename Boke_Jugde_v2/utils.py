@@ -2,6 +2,7 @@ import os
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import japanize_matplotlib
 from PIL import Image
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
@@ -225,20 +226,20 @@ class BokeJugeAI:
         # 大喜利適合判定AIの読み込み
         self.boke_judge_model = BokeJudgeModel()
         self.boke_judge_model.load_state_dict(torch.load(weight_path))
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.boke_judge_model.to(device)
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.boke_judge_model.to(self.device)
         self.boke_judge_model.eval()
 
         # CLIP
-        self.clip_model, self.clip_preprocesser = ja_clip.load("rinna/japanese-clip-vit-b-16", 
-                                             cache_dir="/tmp/japanese_clip", 
+        self.clip_model, self.clip_preprocesser = ja_clip.load("rinna/japanese-clip-vit-b-16",
+                                             cache_dir="/tmp/japanese_clip",
                                              torch_dtype = torch.float16,
-                                             device = device)
+                                             device = self.device)
         self.clip_tokenizer = ja_clip.load_tokenizer()
 
         # Sentence-LUKE
         self.luke_model = SentenceLukeJapanese()
-    
+
     def __call__(self, image_path, sentence):
         """
             image_path: 判定したい大喜利のお題画像
@@ -248,22 +249,22 @@ class BokeJugeAI:
         tokenized_sentences = ja_clip.tokenize(
             texts = [sentence],
             max_seq_len = 77,
-            device = device,
-            tokenizer = clip_tokenizer,
+            device = self.device,
+            tokenizer = self.clip_tokenizer,
             )
         image = Image.open(image_path)
-        preprcessed_image = clip_preprocesser(image).unsqueeze(0).to(device)
+        preprcessed_image = self.clip_preprocesser(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
             clip_image_features = self.clip_model.get_image_features(preprcessed_image)
             clip_sentence_features = self.clip_model.get_text_features(**tokenized_sentences)
 
         # Sentence-LUKEによる特徴量への変換
-        luke_sentence_feature = luke_model.encode([sentence])
+        luke_sentence_feature = self.luke_model.encode([sentence])
 
         # 大喜利適合判定AIの推論
         with torch.no_grad():
-            outputs = model(clip_image_features,
-                            clip_sentence_features,
-                            luke_sentence_feature)
-        
+            outputs = self.boke_judge_model(clip_image_features,
+                                        clip_sentence_features,
+                                        luke_sentence_feature.to(self.device))
+
         return outputs.cpu().numpy()
