@@ -366,7 +366,7 @@ if not os.path.exists(f"{AE_RESULT_DIR}history.png") or RETRAIN_AUTOENCODER:
             loss = train_step_for_autoencoder(autoencoder, optimizer, images)
             train_loss_obj += loss
             pb.set_postfix({"train_loss": train_loss_obj / (pb.n + 1),})
-            break
+
         train_loss = train_loss_obj / len(train_image_dataloader)
 
         # test
@@ -380,7 +380,7 @@ if not os.path.exists(f"{AE_RESULT_DIR}history.png") or RETRAIN_AUTOENCODER:
             loss = test_step_for_autoencoder(autoencoder, images)
             test_loss_obj += loss
             pb.set_postfix({"test_loss": test_loss_obj / (pb.n + 1),})
-            break
+
         test_loss = test_loss_obj / len(test_image_dataloader)
 
         print(f"Epoch: {epoch+1}/{AE_EPOCH}, "
@@ -766,7 +766,7 @@ for epoch in range(SATRT_EPOCH, EPOCH):
         train_loss_obj += loss
         train_accuracy_obj += accuracy
         pb.set_postfix({"train_loss": train_loss_obj / (pb.n + 1), "train_accuracy": train_accuracy_obj / (pb.n + 1)})
-        break
+
     train_loss = train_loss_obj / len(train_dataloader)
     train_accuracy = train_accuracy_obj / len(train_dataloader)
 
@@ -785,7 +785,7 @@ for epoch in range(SATRT_EPOCH, EPOCH):
         test_loss_obj += loss
         test_accuracy_obj += accuracy
         pb.set_postfix({"test_loss": test_loss_obj / (pb.n + 1), "test_accuracy": test_accuracy_obj / (pb.n + 1)})
-        break
+
     test_loss = test_loss_obj / len(test_dataloader)
     test_accuracy = test_accuracy_obj / len(test_dataloader)
 
