@@ -1,11 +1,12 @@
 import os
 import json
 import numpy as np
+import shutil
 import argparse
 import matplotlib.pyplot as plt
-import japanize_matplotlib
 from PIL import Image
 from tqdm import tqdm
+from transformers import ViTImageProcessor, ViTModel
 from sklearn.model_selection import train_test_split
 
 import torch
@@ -38,6 +39,7 @@ parser.add_argument("--epoch", type = int, default = 25, help = "学習反復回
 parser.add_argument("--batch_size", type = int, default = 512, help = "バッチサイズ")
 parser.add_argument("--learning_rate", type = float, default = 0.001, help = "学習率")
 parser.add_argument("--feature_dim", type = int, default = 1024, help = "モデルの特徴量次元数")
+parser.add_argument("--num_heads", type = int, default = 4, help = "Multi Head Self Attentionのヘッド数")
 
 args = parser.parse_args()
 
@@ -58,11 +60,12 @@ EPOCH = args.epoch
 BATCH_SIZE = args.batch_size
 LEARNING_RATE = args.learning_rate
 FEATURE_DIM = args.feature_dim
+NUM_HEADS = args.num_heads
 
-RESULT_DIR = f"../../results/Neural_Joking_Machine/{USE_UNREAL_IMAGE}_{USE_WORD_IMAGE}_{USE_UNIQUE_NOUN_BOKE}_{MIN_STAR}_{MIN_APPER_WORD}_{MIN_SENTENCE_LENGTH}_{MAX_SENTENCE_LENGTH}_{EPOCH}_{BATCH_SIZE}_{LEARNING_RATE}_{FEATURE_DIM}/"
+RESULT_DIR = f"../../results/GUMI_T/{USE_UNREAL_IMAGE}_{USE_WORD_IMAGE}_{USE_UNIQUE_NOUN_BOKE}_{MIN_STAR}_{MIN_APPER_WORD}_{MIN_SENTENCE_LENGTH}_{MAX_SENTENCE_LENGTH}_{EPOCH}_{BATCH_SIZE}_{LEARNING_RATE}_{FEATURE_DIM}_{NUM_HEADS}/"
 
-if not os.path.exists("../../results/Neural_Joking_Machine/"):
-    os.mkdir("../../results/Neural_Joking_Machine/")
+if not os.path.exists("../../results/GUMI_T/"):
+    os.mkdir("../../results/GUMI_T/")
 if not os.path.exists(RESULT_DIR):
     os.mkdir(RESULT_DIR)
 print(f"result directory: {RESULT_DIR}")
@@ -78,13 +81,14 @@ with open(f"{RESULT_DIR}config.json", "w") as f:
         "EPOCH": EPOCH,
         "BATCH_SIZE": BATCH_SIZE,
         "LEARNING_RATE": LEARNING_RATE,
-        "FEATURE_DIM": FEATURE_DIM
+        "FEATURE_DIM": FEATURE_DIM,
+        "NUM_HEADS": NUM_HEADS
     }, f)
 
 DATA_DIR = "../../datas/boke_data_assemble/"
 IMAGE_DIR = "../../datas/boke_image/"
 
-IMAGE_FEATURE_DIR = "../../datas/encoded/resnet152_image_feature/"
+IMAGE_FEATURE_DIR = "../../datas/encoded/vit_image_feature/"
 if not os.path.exists(IMAGE_FEATURE_DIR):
     os.mkdir(IMAGE_FEATURE_DIR)
 
@@ -221,42 +225,38 @@ print(f"学習に用いる大喜利の数: {len(train_boke_datas)}\n",
 
 ###
 # 画像のデータローダを作る関数
-def make_image_dataloader(image_numbers, num_workers = 4):
+def make_image_dataloader(image_paths, batch_size, num_workers = 4):
     # 画像の前処理
-    transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
-    ])
+    image_preprocess =  ViTImageProcessor.from_pretrained('google/vit-base-patch16-224-in21k')
 
     class LoadImageDataset(Dataset):
-        def __init__(self, image_numbers):
+        def __init__(self, image_paths):
             """
-                image_numbers: 画像の番号からなるリスト
+                image_paths: 画像のパスからなるリスト
             """
-            self.image_numbers = image_numbers
+            self.image_paths = image_paths
 
         def __len__(self):
-            return len(self.image_numbers)
+            return len(self.image_paths)
 
         def __getitem__(self, idx):
-            image = Image.open(f"{IMAGE_DIR}{self.image_numbers[idx]}.jpg").convert("RGB")
+            image = Image.open(image_paths[idx]).convert("RGB")
 
-            return image, self.image_numbers[idx]
+            return image, self.image_paths[idx]
     
     def collate_fn_tf(batch):
-        images = torch.stack([transform(B[0]) for B in batch])
+        images = image_preprocess(images = [B[0] for B in batch], 
+                                  return_tensors = "pt")
         image_numbers = [B[1] for B in batch]
 
         return images, image_numbers
 
-    print(f"num data: {len(image_numbers)}")
+    print(f"num data: {len(image_paths)}")
 
-    dataset = LoadImageDataset(image_numbers)
+    dataset = LoadImageDataset(image_paths)
     dataloader = DataLoader(
         dataset, 
-        batch_size = BATCH_SIZE, 
+        batch_size = batch_size, 
         num_workers = num_workers, 
         collate_fn = collate_fn_tf
     )
@@ -269,29 +269,148 @@ tmp = list()
 for IN in tqdm(image_numbers):
     if os.path.exists(f"{IMAGE_FEATURE_DIR}{IN}.npy"):
         continue
-    tmp.append(IN)
+    tmp.append(f"{IMAGE_DIR}{IN}.jpg")
 
 if len(tmp) != 0:
-    image_dataloader = make_image_dataloader(tmp, num_workers = NUM_WORKERS)
+    image_dataloader = make_image_dataloader(tmp, batch_size = 8, num_workers = NUM_WORKERS)
 
-    # resnet152
+    # vision transformer
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    model = models.resnet152(pretrained = True)
-    model = torch.nn.Sequential(*list(model.children())[:-1] + [nn.Flatten()])
+    model = ViTModel.from_pretrained('google/vit-large-patch16-224-in21k')
     model = model.to(device)
     model.eval()
 
-    for Is, INs in tqdm(image_dataloader):
+    for Is, IPs in tqdm(image_dataloader):
         Is = Is.to(device)
-        features = model(Is).detach().cpu().numpy()
+        outputs = model(**Is)
+        features = outputs.last_hidden_state.detach().cpu().numpy()
 
-        for F, IN in zip(features, INs):
-            np.save(f"{IMAGE_FEATURE_DIR}{IN}", F)
+        for f, IP in zip(features, IPs):
+            N = IP.split("/")[-1].split(".")[0]
+            np.save(f"{IMAGE_FEATURE_DIR}{N}", f)
+
+###
+class PositionalEncoding(nn.Module):
+    def __init__(self, max_len, feature_dim):
+        """
+            max_len: 
+            feature_dim: 
+        """
+        super(PositionalEncoding, self).__init__()
+        pe = torch.zeros(max_len, feature_dim)
+        position = torch.arange(0, max_len, dtype = torch.float).unsqueeze(1)
+        div_term = torch.exp(torch.arange(0, feature_dim, 2).float() * -(torch.log(torch.tensor(10000.0)) / feature_dim))
+
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
+        self.register_buffer('pe', pe)
+
+    def forward(self, x):
+        return x + self.pe
+
+class MultiHeadSelfAttentionBlock(nn.Module):
+    def __init__(self, feature_dim, num_heads):
+        super(MultiHeadSelfAttentionBlock, self).__init__()
+
+        self.self_attention = nn.MultiheadAttention(embed_dim = feature_dim, 
+                                                    num_heads = num_heads, batch_first = True)
+        self.layer_norm1 = nn.LayerNorm(feature_dim)
+
+        self.fc = nn.Linear(feature_dim, feature_dim)
+        self.layer_norm2 = nn.LayerNorm(feature_dim)
+    
+    def forward(self, x, attn_mask = None):
+        # self attention
+        x_dash, _ = self.self_attention(x, x, x, attn_mask = attn_mask)
+        x = self.layer_norm1(x_dash) + x
+
+        # feed forward
+        x_dash = F.leaky_relu( self.fc(x) )
+        return self.layer_norm2(x_dash) + x
+
+class MultiHeadCrossAttentionBlock(nn.Module):
+    def __init__(self, feature_dim, num_heads):
+        super(MultiHeadCrossAttentionBlock, self).__init__()
+
+        self.self_attention = nn.MultiheadAttention(embed_dim = feature_dim, 
+                                                    num_heads = num_heads, batch_first = True)
+        self.layer_norm1 = nn.LayerNorm(feature_dim)
+
+        self.cross_attention = nn.MultiheadAttention(embed_dim = feature_dim, 
+                                                     num_heads = num_heads, batch_first = True)
+        self.layer_norm2 = nn.LayerNorm(feature_dim)
+
+        self.fc = nn.Linear(feature_dim, feature_dim)
+        self.layer_norm3 = nn.LayerNorm(feature_dim)
+    
+    def forward(self, src, tgt, attn_mask = None):
+        # self attention
+        tgt_dash, _ = self.self_attention(tgt, tgt, tgt, attn_mask = attn_mask)
+        tgt = self.layer_norm1(tgt_dash) + tgt
+        
+        # cross attention
+        src_dash, _ = self.cross_attention(tgt, src, src)
+        tgt = self.layer_norm2(src_dash) + tgt
+
+        # feed forward
+        tgt_dash = F.leaky_relu( self.fc(tgt) )
+        return self.layer_norm3(tgt_dash) + tgt
+
+# 大喜利生成モデルのクラス
+class TransformerBokeGeneratorModel(nn.Module):
+    def __init__(self, num_image_patch, image_feature_dim, num_word, sentence_length, feature_dim = 1024, num_heads = 4):
+        """
+            num_image_patch
+            num_word: 学習に用いる単語の総数
+            image_feature_dim: 画像の特徴量の次元数
+            sentence_length: 入力する文章の単語数
+            feature_dim: 単語の埋め込み次元数
+            num_heads: 
+        """
+        super(TransformerBokeGeneratorModel, self).__init__()
+        self.num_word = num_word
+        self.image_feature_dim = image_feature_dim
+        self.sentence_length = sentence_length
+        self.feature_dim = feature_dim
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # image encoder
+        self.fc1 = nn.Linear(image_feature_dim, feature_dim)
+        self.pe1 = PositionalEncoding(num_image_patch, feature_dim)
+        self.self_attention = MultiHeadSelfAttentionBlock(feature_dim = feature_dim, num_heads = num_heads)
+        
+        # sentence decoder
+        self.embedding = nn.Embedding(num_word, feature_dim, padding_idx = 0)
+        self.pe2 = PositionalEncoding(sentence_length, feature_dim)
+
+        self.cross_attention1 = MultiHeadCrossAttentionBlock(feature_dim = feature_dim, num_heads = num_heads)
+        self.cross_attention2 = MultiHeadCrossAttentionBlock(feature_dim = feature_dim, num_heads = num_heads)
+        self.fc2 = nn.Linear(feature_dim, num_word)
+
+    def forward(self, image_features, sentences):
+        """
+            image_features: 画像の特徴量(batch_size, num_patch, image_feature_dim)
+            sentences: 入力する文章(batch_size, sentence_length)
+        """
+        # encode image 
+        src = F.leaky_relu( self.fc1( image_features ) )
+        src = self.pe1( src )
+        src = self.self_attention( src )
+
+        # decode sentence
+        tgt = self.embedding( sentences )
+        tgt = self.pe2( tgt )
+
+        attn_mask = torch.triu(torch.ones(self.sentence_length, self.sentence_length), diagonal = 1)
+        attn_mask = attn_mask.masked_fill(attn_mask == 1, float('-inf')).to(self.device)
+
+        tgt = self.cross_attention1( tgt = tgt, src = src, attn_mask = attn_mask )
+        tgt = self.cross_attention2( tgt = tgt, src = src, attn_mask = attn_mask  )
+        return self.fc2( tgt )
 
 ###
 # 大喜利生成AIの学習用データローダを作る関数
-def make_dataloader(boke_datas, max_sentence_length, num_workers = 4):
+def make_dataloader(boke_datas, max_sentence_length, batch_size, num_workers = 4):
     """
         boke_datas: {"image_number":画像のお題番号 ,"tokenized_boke":トークナイズされた大喜利}からなるリスト
         max_sentence_length: 学習データの最大単語数(<START>, <END>トークンを含まない)
@@ -341,7 +460,7 @@ def make_dataloader(boke_datas, max_sentence_length, num_workers = 4):
     dataset = SentenceGeneratorDataset(image_file_numbers, sentences, teacher_signals)
     dataloader = DataLoader(
         dataset, 
-        batch_size = BATCH_SIZE, 
+        batch_size = batch_size, 
         num_workers = num_workers, 
         collate_fn = collate_fn_tf
     )
@@ -349,48 +468,6 @@ def make_dataloader(boke_datas, max_sentence_length, num_workers = 4):
     print(f"num data: {len(teacher_signals)}")
 
     return dataloader
-
-###
-# 大喜利生成モデルのクラス
-class BokeGeneratorModel(nn.Module):
-    def __init__(self, num_word, image_feature_dim, sentence_length, feature_dim = 1024):
-        """
-            num_word: 学習に用いる単語の総数
-            image_feature_dim: 画像の特徴量の次元数
-            sentence_length: 入力する文章の単語数
-            feature_dim: 特徴量次元数
-        """
-        super(BokeGeneratorModel, self).__init__()
-        self.num_word = num_word
-        self.image_feature_dim = image_feature_dim
-        self.sentence_length = sentence_length
-        self.feature_dim = feature_dim
-        
-        self.fc1 = nn.Linear(image_feature_dim, feature_dim)
-        self.embedding = nn.Embedding(num_word, feature_dim, padding_idx = 0)
-        self.lstm = nn.LSTM(input_size = feature_dim, hidden_size = feature_dim, 
-                            batch_first = True)
-        self.fc2 = nn.Linear(feature_dim + feature_dim, 2 * feature_dim)
-        self.fc3 = nn.Linear(2 * feature_dim, 2 * feature_dim)
-        self.fc4 = nn.Linear(2 * feature_dim, num_word)
-    
-    # LSTMの初期値は0で，画像の特徴量と文章の特徴量を全結合層の前で結合する
-    def forward(self, image_features, sentences):
-        """
-            image_features: 画像の特徴量
-            sentences: 入力する文章
-        """
-        x1 = F.leaky_relu(self.fc1(image_features))
-        x1 = x1.unsqueeze(1).repeat(1, self.sentence_length, 1)
-
-        x2 = self.embedding(sentences)
-        x2, _ = self.lstm(x2)
-
-        x = torch.cat((x1, x2), dim = -1)
-        x = F.leaky_relu(self.fc2(x))
-        x = F.leaky_relu(self.fc3(x))
-
-        return self.fc4(x)
 
 ###
 # 文章生成の精度を計算する関数
@@ -429,13 +506,15 @@ def evaluate(model, batch_data, batch_labels):
     return loss.item(), accuracy
 
 ###
-train_dataloader = make_dataloader(train_boke_datas, max_sentence_length = MAX_SENTENCE_LENGTH, num_workers = NUM_WORKERS)
-test_dataloader = make_dataloader(test_boke_datas, max_sentence_length = MAX_SENTENCE_LENGTH, num_workers = NUM_WORKERS)
+train_dataloader = make_dataloader(train_boke_datas, max_sentence_length = MAX_SENTENCE_LENGTH, batch_size = BATCH_SIZE, num_workers = NUM_WORKERS)
+test_dataloader = make_dataloader(test_boke_datas, max_sentence_length = MAX_SENTENCE_LENGTH, batch_size = BATCH_SIZE, num_workers = NUM_WORKERS)
 
-model = BokeGeneratorModel(num_word = len(index_to_word), 
-                           image_feature_dim = 2048, 
-                           sentence_length = MAX_SENTENCE_LENGTH + 1, 
-                           feature_dim = FEATURE_DIM)
+model = TransformerBokeGeneratorModel(num_image_patch = 197, 
+                                      image_feature_dim = 1024, 
+                                      num_word = len(index_to_word), 
+                                      sentence_length = MAX_SENTENCE_LENGTH + 1, 
+                                      feature_dim = FEATURE_DIM, 
+                                      num_heads = NUM_HEADS)
 
 # 学習履歴がある場合，途中から再開する
 if os.path.exists(f"{RESULT_DIR}history.json"):
@@ -511,11 +590,11 @@ for epoch in range(START_EPOCH, EPOCH):
     torch.save(model.state_dict(), f"{RESULT_DIR}model_{len(train_loss_history):03}.pth")
     if os.path.exists(f"{RESULT_DIR}model_{len(train_loss_history) - 1:03}.pth"):
         os.remove(f"{RESULT_DIR}model_{len(train_loss_history) - 1:03}.pth")
-
+        
     # 学習精度を更新した場合、重みを保存
     if max(train_accuracy_history) == train_accuracy:
         torch.save(model.state_dict(), f"{RESULT_DIR}best_model.pth")
-    
+
     # 学習結果を保存
     with open(f"{RESULT_DIR}history.json", "w") as f:
         json.dump({
@@ -525,7 +604,6 @@ for epoch in range(START_EPOCH, EPOCH):
             "test_accuracy": test_accuracy_history
         }, f)
 
-###
 # 学習結果を描画
 fig = plt.figure(figsize = (10, 5))
 ax = fig.add_subplot(1, 2, 1)
@@ -545,76 +623,3 @@ ax.legend()
 ax.grid()
 
 fig.savefig(f"{RESULT_DIR}history.png")
-
-###
-# 大喜利生成AI
-class NeuralJokingMachine:
-    def __init__(self, weight_path, index_to_word, sentence_length, feature_dim = 512):
-        """
-            weight_path: 大喜利適合判定モデルの学習済みの重みのパス
-            index_to_word: 単語のID: 単語の辞書(0:<PAD>, 1:<START>, 2:<END>)
-            sentence_length: 入力する文章の単語数
-            feature_dim: 特徴量次元数
-        """
-        self.index_to_word = index_to_word
-        self.sentence_length = sentence_length
-
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        self.boke_generate_model = BokeGeneratorModel(
-                                        num_word = len(index_to_word), 
-                                        image_feature_dim = 2048, 
-                                        sentence_length = sentence_length, 
-                                        feature_dim = feature_dim)
-        self.boke_generate_model.load_state_dict(torch.load(weight_path))
-        self.boke_generate_model.to(self.device)
-        self.boke_generate_model.eval()
-
-        self.resnet152 = models.resnet152(pretrained = True)
-        self.resnet152 = torch.nn.Sequential(*list(self.resnet152.children())[:-1] + [nn.Flatten()])
-        self.resnet152 = self.resnet152.to(self.device)
-        self.resnet152.eval()
-
-        # 画像の前処理
-        self.image_preprocesser = transforms.Compose([
-            transforms.Resize(256),
-            transforms.CenterCrop(224),
-            transforms.ToTensor(),
-            transforms.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225])
-        ])
-    
-    def __call__(self, image_path, argmax = False, top_k = 5):
-        """
-            image_path: 大喜利を生成したい画像のパス
-            argmax: Trueなら最大確率の単語を選ぶ, FalseならTop-Kサンプリングを行う
-            top_k: Top-Kサンプリング時に考慮する単語の数
-        """
-        image = Image.open(image_path)
-        preprocessed_image = self.image_preprocesser(image).to(self.device)
-        image_feature = self.resnet152( preprocessed_image.unsqueeze(0) ) # (1, 2048)
-        
-        generated_text = [1] # <START>トークン
-        for i in range(1, self.sentence_length):
-            tmp = generated_text + [0] * (self.sentence_length - i) # Padding
-            tmp = torch.Tensor(np.array(tmp)).unsqueeze(0).to(self.device).to(dtype=torch.int32) # (1, sentence_length)
-            pred = self.boke_generate_model(image_feature, tmp) # (1, sentence_length, num_word)
-            target_pred = pred[0][i - 1]
-
-            if argmax:
-                # 最大確率の単語を選ぶ
-                chosen_id = torch.argmax(target_pred).item()
-            else:
-                # Top-Kサンプリング
-                top_k_probs, top_k_indices = torch.topk(target_pred, top_k)
-                top_k_probs = torch.nn.functional.softmax(top_k_probs, dim = -1)
-                chosen_id = np.random.choice(top_k_indices.detach().cpu().numpy(), 
-                                             p = top_k_probs.detach().cpu().numpy())
-            
-            generated_text.append(chosen_id)
-            if chosen_id == 2:
-                break
-        
-        generated_sentence = ""
-        for I in generated_text[1:-1]:
-            generated_sentence += self.index_to_word[I]
-        return generated_sentence

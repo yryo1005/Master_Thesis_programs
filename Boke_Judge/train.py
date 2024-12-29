@@ -329,19 +329,19 @@ if os.path.exists(f"{RESULT_DIR}history.json"):
         test_loss_history = a["test_loss"]
         test_accuracy_history = a["test_accuracy"]
     model.load_state_dict(torch.load(f"{RESULT_DIR}model_{len(train_loss_history):03}.pth"))
-    SATRT_EPOCH = len(train_loss_history)
+    START_EPOCH = len(train_loss_history)
 else:
     train_loss_history = []
     train_accuracy_history = []
     test_loss_history = []
     test_accuracy_history = []
-    SATRT_EPOCH = 0
+    START_EPOCH = 0
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
 optimizer = optim.AdamW(model.parameters(), lr = LEARNING_RATE)
 
-for epoch in range(SATRT_EPOCH, EPOCH):
+for epoch in range(START_EPOCH, EPOCH):
 
     # train
     train_loss_obj = 0.0
