@@ -36,10 +36,10 @@ parser.add_argument("--min_apper_word", type = int, default = 32, help = "単語
 parser.add_argument("--min_sentence_length", type = int, default = 4, help = "大喜利の最小単語数")
 parser.add_argument("--max_sentence_length", type = int, default = 31, help = "大喜利の最大単語数")
 parser.add_argument("--epoch", type = int, default = 25, help = "学習反復回数")
-parser.add_argument("--batch_size", type = int, default = 512, help = "バッチサイズ")
-parser.add_argument("--learning_rate", type = float, default = 0.001, help = "学習率")
+parser.add_argument("--batch_size", type = int, default = 64, help = "バッチサイズ")
+parser.add_argument("--learning_rate", type = float, default = 0.0001, help = "学習率")
 parser.add_argument("--feature_dim", type = int, default = 1024, help = "モデルの特徴量次元数")
-parser.add_argument("--num_heads", type = int, default = 4, help = "Multi Head Self Attentionのヘッド数")
+parser.add_argument("--num_heads", type = int, default = 8, help = "Multi Head Self Attentionのヘッド数")
 
 args = parser.parse_args()
 

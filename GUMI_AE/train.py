@@ -42,8 +42,8 @@ parser.add_argument("--ae_epoch", type = int, default = 25, help = "AEの学習�
 parser.add_argument("--ae_batch_size", type = int, default = 32, help = "AEのバッチサイズ")
 parser.add_argument("--ae_learning_rate", type = float, default = 0.0001, help = "AEの学習率")
 parser.add_argument("--epoch", type = int, default = 25, help = "学習反復回数")
-parser.add_argument("--batch_size", type = int, default = 512, help = "バッチサイズ")
-parser.add_argument("--learning_rate", type = float, default = 0.001, help = "学習率")
+parser.add_argument("--batch_size", type = int, default = 64, help = "バッチサイズ")
+parser.add_argument("--learning_rate", type = float, default = 0.0001, help = "学習率")
 parser.add_argument("--feature_dim", type = int, default = 1024, help = "モデルの特徴量次元数")
 
 args = parser.parse_args()

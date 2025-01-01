@@ -46,7 +46,7 @@ parser.add_argument("--amae_alpha", type = float, default = 1.0, help = "AMAEの
 parser.add_argument("--amae_chain", type = int, default = 3, help = "Augmixで何枚の画像に加工するか")
 parser.add_argument("--amae_depth", type = int, default = 3, help = "Augmixで1枚に最大何種類の加工をするか")
 parser.add_argument("--epoch", type = int, default = 25, help = "学習反復回数")
-parser.add_argument("--batch_size", type = int, default = 512, help = "バッチサイズ")
+parser.add_argument("--batch_size", type = int, default = 64, help = "バッチサイズ")
 parser.add_argument("--learning_rate", type = float, default = 0.0001, help = "学習率")
 parser.add_argument("--feature_dim", type = int, default = 1024, help = "モデルの特徴量次元数")
 
