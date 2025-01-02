@@ -286,8 +286,8 @@ if len(tmp) != 0:
         Is = Is.to(device)
         features = model(Is).detach().cpu().numpy()
 
-        for F, IN in zip(features, INs):
-            np.save(f"{IMAGE_FEATURE_DIR}{IN}", F)
+        for f, IN in zip(features, INs):
+            np.save(f"{IMAGE_FEATURE_DIR}{IN}", f)
 
 ###
 # 大喜利生成AIの学習用データローダを作る関数
