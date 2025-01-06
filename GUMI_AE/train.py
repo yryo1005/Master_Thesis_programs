@@ -119,7 +119,7 @@ with open(f"{RESULT_DIR}config.json", "w") as f:
         "EPOCH": AE_EPOCH,
         "BATCH_SIZE": AE_BATCH_SIZE,
         "LEARNING_RATE": AE_LEARNING_RATE,
-        "FEATURE_DIM": AE_FEATURE_DIM,
+        "AE_FEATURE_DIM": AE_FEATURE_DIM,
         "EPOCH": EPOCH,
         "BATCH_SIZE": BATCH_SIZE,
         "LEARNING_RATE": LEARNING_RATE,
