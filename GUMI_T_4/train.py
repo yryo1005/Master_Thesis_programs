@@ -62,10 +62,10 @@ LEARNING_RATE = args.learning_rate
 FEATURE_DIM = args.feature_dim
 NUM_HEADS = args.num_heads
 
-RESULT_DIR = f"../../results/GUMI_T/{USE_UNREAL_IMAGE}_{USE_WORD_IMAGE}_{USE_UNIQUE_NOUN_BOKE}_{MIN_STAR}_{MIN_APPER_WORD}_{MIN_SENTENCE_LENGTH}_{MAX_SENTENCE_LENGTH}_{EPOCH}_{BATCH_SIZE}_{LEARNING_RATE}_{FEATURE_DIM}_{NUM_HEADS}/"
+RESULT_DIR = f"../../results/GUMI_T_4/{USE_UNREAL_IMAGE}_{USE_WORD_IMAGE}_{USE_UNIQUE_NOUN_BOKE}_{MIN_STAR}_{MIN_APPER_WORD}_{MIN_SENTENCE_LENGTH}_{MAX_SENTENCE_LENGTH}_{EPOCH}_{BATCH_SIZE}_{LEARNING_RATE}_{FEATURE_DIM}_{NUM_HEADS}/"
 
-if not os.path.exists("../../results/GUMI_T/"):
-    os.mkdir("../../results/GUMI_T/")
+if not os.path.exists("../../results/GUMI_T_4/"):
+    os.mkdir("../../results/GUMI_T_4/")
 if not os.path.exists(RESULT_DIR):
     os.mkdir(RESULT_DIR)
 print(f"result directory: {RESULT_DIR}")
