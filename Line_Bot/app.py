@@ -264,6 +264,9 @@ def choice_ohgiri():
     methods = [
         "human",
         "caption",
+        "GUMI_AE",
+        "GUMI_AMAE_10000.0",
+        "GUMI_AMAE_1000.0",
         "GUMI_AMAE_100.0",
         "GUMI_AMAE_10.0",
         "GUMI_AMAE_1.0",
