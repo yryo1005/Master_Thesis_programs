@@ -54,6 +54,7 @@ def callback():
         app.logger.info("Invalid signature. Please check your channel access token/channel secret.")
         abort(400)
 
+    print("verified")
     return 'OK'
 
 ## 友達追加された場合
@@ -445,9 +446,13 @@ if __name__ == "__main__":
     flask run --reload --port 8080
 2つ目のコマンドプロンプトで
     wsl -d Ubuntu2204_Colab20241111 -u user
-    cd /home/user/workspace/Master_Thesis/Master_Thesis_programs/Line_Bot
-    conda activate Colab_20241111
     ngrok http 8080
+を実行
+
+PermissionErrorが出る場合は，
+    sudo chmod 777 /home/user/workspace/Master_Thesis/Master_Thesis_programs/Line_Bot/vote_results.csv
+    sudo chmod 777 /home/user/workspace/Master_Thesis/Master_Thesis_programs/Line_Bot/user_informations.csv
+    sudo chmod 777 /home/user/workspace/Master_Thesis/Master_Thesis_programs/Line_Bot/tmp.jpg
 を実行
 
     https://
